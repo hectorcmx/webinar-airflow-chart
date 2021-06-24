@@ -143,6 +143,7 @@ networkPolicies:
   # Enabled network policies
   enabled: false
 
+
 # Extra annotations to apply to all
 # Airflow pods
 airflowPodAnnotations: {}
@@ -151,7 +152,7 @@ airflowPodAnnotations: {}
 # main Airflow configmap
 airflowConfigAnnotations: {}
 
-# `airflow_local_settings` file as a string (can be templated).
+# `airflow_local_settings` file as a string.
 airflowLocalSettings: ~
 
 # Enable RBAC (default on most clusters these days)
@@ -159,9 +160,7 @@ rbac:
   # Specifies whether RBAC resources should be created
   create: true
 
-# Airflow executor
-# Options: LocalExecutor, CeleryExecutor, KubernetesExecutor, CeleryKubernetesExecutor
-executor: "CeleryExecutor"
+6
 
 # If this is true and using LocalExecutor/KubernetesExecutor/CeleryKubernetesExecutor, the scheduler's
 # service account will have access to communicate with the api-server and launch pods.
@@ -195,7 +194,7 @@ extraSecrets: {}
 #       AIRFLOW_CONN_AWS: 'base64_encoded_aws_conn_string'
 #     stringData: |
 #       AIRFLOW_CONN_OTHER: 'other_conn'
-#   '{{ .Release.Name }}-other-secret-name-suffix':
+#   '{{ .Release.Name }}-other-secret-name-suffix': |
 #     data: |
 #        ...
 
@@ -224,13 +223,9 @@ extraEnv: ~
 
 # Extra envFrom 'items' that will be added to the definition of airflow containers
 # A string is expected (can be templated).
-extraEnvFrom: ~
-# eg:
-# extraEnvFrom: |
-#   - secretRef:
-#       name: '{{ .Release.Name }}-airflow-connections'
-#   - configMapRef:
-#       name: '{{ .Release.Name }}-airflow-variables'
+extraEnvFrom:  |
+   - configMapRef:
+       name: 'airflow-variables'
 
 # Airflow database & redis config
 data:
@@ -244,7 +239,7 @@ data:
     user: postgres
     pass: postgres
     protocol: postgresql
-    host: ~
+    host:
     port: 5432
     db: postgres
     sslmode: disable
@@ -259,13 +254,12 @@ data:
   #   port: 5432
   #   db: postgres
   #   sslmode: disable
-  # Note: brokerUrl can only be set during install, not upgrade
   brokerUrl: ~
 
 # Fernet key settings
-# Note: fernetKey can only be set during install, not upgrade
 fernetKey: ~
 fernetKeySecretName: ~
+
 
 # In order to use kerberos you need to create secret containing the keytab file
 # The secret name should follow naming convention of the application where resources are
@@ -300,35 +294,28 @@ kerberos:
     # order to make it production-ready you must replace it with your own configuration that
     # Matches your kerberos deployment. Administrators of your Kerberos instance should
     # provide the right configuration.
+
     [logging]
     default = "FILE:{{ template "airflow_logs_no_quote" . }}/kerberos_libs.log"
     kdc = "FILE:{{ template "airflow_logs_no_quote" . }}/kerberos_kdc.log"
     admin_server = "FILE:{{ template "airflow_logs_no_quote" . }}/kadmind.log"
+
     [libdefaults]
     default_realm = FOO.COM
     ticket_lifetime = 10h
     renew_lifetime = 7d
     forwardable = true
+
     [realms]
     FOO.COM = {
       kdc = kdc-server.foo.com
       admin_server = admin_server.foo.com
     }
+
 # Airflow Worker Config
 workers:
   # Number of airflow celery workers in StatefulSet
   replicas: 1
-
-  # Command to use when running Airflow workers (templated).
-  command: ~
-  # Args to use when running Airflow workers (templated).
-  args:
-    - "bash"
-    - "-c"
-    # The format below is necessary to get `helm lint` happy
-    - |-
-      exec \
-      airflow {{ semverCompare ">=2.0.0" .Values.airflowVersion | ternary "celery worker" "worker" }}
   # Update Strategy when worker is deployed as a StatefulSet
   updateStrategy: ~
   # Update Strategy when worker is deployed as a Deployment
@@ -360,9 +347,6 @@ workers:
     # How many seconds KEDA will wait before scaling to zero.
     # Note that HPA has a separate cooldown period for scale-downs
     cooldownPeriod: 30
-
-    # Minimum number of workers created by keda
-    minReplicaCount: 0
 
     # Maximum number of workers created by keda
     maxReplicaCount: 10
@@ -407,8 +391,6 @@ workers:
 
   # Launch additional containers into worker.
   extraContainers: []
-  # Add additional init containers into workers.
-  extraInitContainers: []
 
   # Mount additional volumes into worker.
   extraVolumes: []
@@ -416,15 +398,7 @@ workers:
 
   # Select certain nodes for airflow worker pods.
   nodeSelector: {}
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                component: worker
-            topologyKey: "kubernetes.io/hostname"
+  affinity: {}
   tolerations: []
   # hostAliases to use in worker pods.
   # See:
@@ -436,19 +410,6 @@ workers:
   # - ip: "127.0.0.3"
   #   hostnames:
   #   - "test.hostname.two"
-
-  logGroomerSidecar:
-    # Command to use when running the Airflow scheduler log groomer sidecar (templated).
-    command: ~
-    # Args to use when running the Airflow scheduler log groomer sidecar (templated).
-    args: ["bash", "/clean-logs"]
-    resources: {}
-    #  limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    #  requests:
-    #   cpu: 100m
-    #   memory: 128Mi
 
 # Airflow scheduler settings
 scheduler:
@@ -462,18 +423,6 @@ scheduler:
   # Airflow 2.0 allows users to run multiple schedulers,
   # However this feature is only recommended for MySQL 8+ and Postgres
   replicas: 1
-
-  # Command to use when running the Airflow scheduler (templated).
-  command: ~
-  # Args to use when running the Airflow scheduler (templated).
-  args: ["bash", "-c", "exec airflow scheduler"]
-
-  # Update Strategy when scheduler is deployed as a StatefulSet
-  # (when using LocalExecutor and workers.persistence)
-  updateStrategy: ~
-  # Update Strategy when scheduler is deployed as a Deployment
-  # (when not using LocalExecutor and workers.persistence)
-  strategy: ~
 
   # Create ServiceAccount
   serviceAccount:
@@ -508,8 +457,6 @@ scheduler:
 
   # Launch additional containers into scheduler.
   extraContainers: []
-  # Add additional init containers into scheduler.
-  extraInitContainers: []
 
   # Mount additional volumes into scheduler.
   extraVolumes: []
@@ -517,38 +464,11 @@ scheduler:
 
   # Select certain nodes for airflow scheduler pods.
   nodeSelector: {}
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                component: scheduler
-            topologyKey: "kubernetes.io/hostname"
+  affinity: {}
   tolerations: []
 
-  logGroomerSidecar:
-    # Whether to deploy the Airflow scheduler log groomer sidecar.
-    enabled: true
-    # Command to use when running the Airflow scheduler log groomer sidecar (templated).
-    command: ~
-    # Args to use when running the Airflow scheduler log groomer sidecar (templated).
-    args: ["bash", "/clean-logs"]
-    resources: {}
-    #  limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    #  requests:
-    #   cpu: 100m
-    #   memory: 128Mi
 # Airflow create user job settings
 createUserJob:
-  # Annotations on the create user job pod
-  annotations: {}
-  # jobAnnotations are annotations on the create user job
-  jobAnnotations: {}
-
   # Create ServiceAccount
   serviceAccount:
     # Specifies whether a ServiceAccount should be created
@@ -560,16 +480,8 @@ createUserJob:
     # Annotations to add to create user kubernetes service account.
     annotations: {}
 
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
-
 # Airflow database migration job settings
 migrateDatabaseJob:
-  # Annotations on the database migration pod
-  annotations: {}
-  # jobAnnotations are annotations on the database migration job
-  jobAnnotations: {}
 
   # Create ServiceAccount
   serviceAccount:
@@ -581,10 +493,6 @@ migrateDatabaseJob:
 
     # Annotations to add to migrate database job kubernetes service account.
     annotations: {}
-
-  nodeSelector: {}
-  affinity: {}
-  tolerations: []
 
 # Airflow webserver settings
 webserver:
@@ -603,11 +511,6 @@ webserver:
 
   # Number of webservers
   replicas: 1
-
-  # Command to use when running the Airflow webserver (templated).
-  command: ~
-  # Args to use when running the Airflow webserver (templated).
-  args: ["bash", "-c", "exec airflow webserver"]
 
   # Create ServiceAccount
   serviceAccount:
@@ -646,16 +549,14 @@ webserver:
 
   # Launch additional containers into webserver.
   extraContainers: []
-  # Add additional init containers into webserver.
-  extraInitContainers: []
-
 
   # Mount additional volumes into webserver.
   extraVolumes: []
   extraVolumeMounts: []
 
-  # This string (can be templated) will be mounted into the Airflow Webserver as a custom
-  # webserver_config.py. You can bake a webserver_config.py in to your image instead.
+  # This will be mounted into the Airflow Webserver as a custom
+  # webserver_config.py. You can bake a webserver_config.py in to your image
+  # instead
   webserverConfig: ~
   # webserverConfig: |
   #   from airflow import configuration as conf
@@ -670,32 +571,10 @@ webserver:
     type: ClusterIP
     ## service annotations
     annotations: {}
-    ports:
-      - name: airflow-ui
-        port: "{{ .Values.ports.airflowUI }}"
-    # To change the port used to access the webserver:
-    # ports:
-    #   - name: airflow-ui
-    #     port: 80
-    #     targetPort: airflow-ui
-    # To only expose a sidecar, not the webserver directly:
-    # ports:
-    #   - name: only_sidecar
-    #     port: 80
-    #     targetPort: 8888
-    loadBalancerIP: ~
 
   # Select certain nodes for airflow webserver pods.
   nodeSelector: {}
-  affinity:
-    podAntiAffinity:
-      preferredDuringSchedulingIgnoredDuringExecution:
-        - weight: 100
-          podAffinityTerm:
-            labelSelector:
-              matchLabels:
-                component: webserver
-            topologyKey: "kubernetes.io/hostname"
+  affinity: {}
   tolerations: []
 
 # Flower settings
@@ -703,17 +582,6 @@ flower:
   # Enable flower.
   # If True, and using CeleryExecutor/CeleryKubernetesExecutor, will deploy flower app.
   enabled: true
-
-  # Command to use when running flower (templated).
-  command: ~
-  # Args to use when running flower (templated).
-  args:
-    - "bash"
-    - "-c"
-    # The format below is necessary to get `helm lint` happy
-    - |-
-      exec \
-      airflow {{ semverCompare ">=2.0.0" .Values.airflowVersion | ternary "celery flower" "flower" }}
   # Additional network policies as needed
   extraNetworkPolicies: []
   resources: {}
@@ -744,22 +612,6 @@ flower:
 
   service:
     type: ClusterIP
-    ## service annotations
-    annotations: {}
-    ports:
-      - name: flower-ui
-        port: "{{ .Values.ports.flowerUI }}"
-    # To change the port used to access flower:
-    # ports:
-    #   - name: flower-ui
-    #     port: 8080
-    #     targetPort: flower-ui
-    loadBalancerIP: ~
-
-  # Launch additional containers into the flower pods.
-  extraContainers: []
-  # Mount additional volumes into the flower pods.
-  extraVolumes: []
 
   # Select certain nodes for airflow flower pods.
   nodeSelector: {}
@@ -804,9 +656,9 @@ statsd:
 
   uid: 65534
 
-# PgBouncer settings
+# Pgbouncer settings
 pgbouncer:
-  # Enable PgBouncer
+  # Enable pgbouncer
   enabled: false
 
   # Create ServiceAccount
@@ -827,7 +679,7 @@ pgbouncer:
   metadataPoolSize: 10
   resultBackendPoolSize: 5
 
-  # Maximum clients that can connect to PgBouncer (higher = more file descriptors)
+  # Maximum clients that can connect to pgbouncer (higher = more file descriptors)
   maxClientConn: 100
 
   # supply the name of existing secret with pgbouncer.ini and users.txt defined
@@ -845,7 +697,7 @@ pgbouncer:
   #
   configSecretName: ~
 
-  # PgBouncer pod disruption budget
+  # Pgbouner pod disruption budget
   podDisruptionBudget:
     enabled: false
 
@@ -853,7 +705,7 @@ pgbouncer:
     config:
       maxUnavailable: 1
 
-  # Limit the resources to PgBouncer.
+  # Limit the resources to pgbouncer.
   # When you specify the resource request the k8s scheduler uses this information to decide which node to
   # place the Pod on. When you specify a resource limit for a Container, the kubelet enforces those limits so
   # that the running container is not allowed to use more of that resource than the limit you set.
@@ -885,29 +737,12 @@ pgbouncer:
     cert: ~
     key: ~
 
-  # Add extra PgBouncer ini configuration in the databases section:
-  # https://www.pgbouncer.org/config.html#section-databases
-  extraIniMetadata: ~
-  extraIniResultBackend: ~
-  # Add extra general PgBouncer ini configuration: https://www.pgbouncer.org/config.html
-  extraIni: ~
-
-  # Select certain nodes for PgBouncer pods.
+  # Select certain nodes for pgbouncer pods.
   nodeSelector: {}
   affinity: {}
   tolerations: []
 
   uid: 65534
-
-  metricsExporterSidecar:
-    resources: {}
-    #  limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    #  requests:
-    #   cpu: 100m
-    #   memory: 128Mi
-
 
 # Configuration for the redis provisioned by the chart
 redis:
@@ -946,7 +781,6 @@ redis:
 
   # Else, if password is set, create secret with it,
   # Otherwise a new password will be generated on install
-  # Note: password can only be set during install, not upgrade.
   password: ~
 
   # This setting tells kubernetes that its ok to evict
@@ -985,6 +819,7 @@ elasticsearch:
   #   host: ~
   #   port: ~
   connection: {}
+
 
 # All ports used by chart
 ports:
@@ -1122,8 +957,10 @@ dags:
     # git@github.com:apache/airflow.git
     # https example: https://github.com/apache/airflow.git
     repo: https://github.com/apache/airflow.git
-    branch: v2-1-stable
+    branch: v2-0-stable
     rev: HEAD
+    root: "/git"
+    dest: "repo"
     depth: 1
     # the number of consecutive failures allowed before aborting
     maxFailures: 0
@@ -1170,13 +1007,6 @@ dags:
     uid: 65533
     extraVolumeMounts: []
     env: []
-    resources: {}
-    #  limits:
-    #   cpu: 100m
-    #   memory: 128Mi
-    #  requests:
-    #   cpu: 100m
-    #   memory: 128Mi
 
 logs:
   persistence:
