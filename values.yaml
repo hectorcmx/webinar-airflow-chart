@@ -300,20 +300,24 @@ kerberos:
     # order to make it production-ready you must replace it with your own configuration that
     # Matches your kerberos deployment. Administrators of your Kerberos instance should
     # provide the right configuration.
+
     [logging]
     default = "FILE:{{ template "airflow_logs_no_quote" . }}/kerberos_libs.log"
     kdc = "FILE:{{ template "airflow_logs_no_quote" . }}/kerberos_kdc.log"
     admin_server = "FILE:{{ template "airflow_logs_no_quote" . }}/kadmind.log"
+
     [libdefaults]
     default_realm = FOO.COM
     ticket_lifetime = 10h
     renew_lifetime = 7d
     forwardable = true
+
     [realms]
     FOO.COM = {
       kdc = kdc-server.foo.com
       admin_server = admin_server.foo.com
     }
+
 # Airflow Worker Config
 workers:
   # Number of airflow celery workers in StatefulSet
@@ -329,6 +333,7 @@ workers:
     - |-
       exec \
       airflow {{ semverCompare ">=2.0.0" .Values.airflowVersion | ternary "celery worker" "worker" }}
+
   # Update Strategy when worker is deployed as a StatefulSet
   updateStrategy: ~
   # Update Strategy when worker is deployed as a Deployment
@@ -714,6 +719,7 @@ flower:
     - |-
       exec \
       airflow {{ semverCompare ">=2.0.0" .Values.airflowVersion | ternary "celery flower" "flower" }}
+
   # Additional network policies as needed
   extraNetworkPolicies: []
   resources: {}
@@ -1188,4 +1194,3 @@ logs:
     storageClassName:
     ## the name of an existing PVC to use
     existingClaim:
-
