@@ -241,12 +241,12 @@ data:
 
   # Otherwise pass connection values in
   metadataConnection:
-    user: postgres
-    pass: postgres
+    user: schneider
+    pass: electric1!
     protocol: postgresql
-    host: ~
+    host: senamds-rds-airflow-k8s-732364666879-useast1.cluster-cg06scc63n2a.us-east-1.rds.amazonaws.com
     port: 5432
-    db: postgres
+    db: airflow
     sslmode: disable
   # resultBackendConnection defaults to the same database as metadataConnection
   resultBackendConnection: ~
@@ -1034,7 +1034,7 @@ cleanup:
 # Configuration for postgresql subchart
 # Not recommended for production
 postgresql:
-  enabled: true
+  enabled: false
   postgresqlPassword: postgres
   postgresqlUsername: postgres
 
